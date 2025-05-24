@@ -9,12 +9,15 @@
     "type": "git",
     "url": "git+https://github.com/ivo-toby/contentful-mcp-graphql.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
-    "mcp-server-contentful-graphql": "./bin/mcp-server.js",
-    "contentful-graphql-mcp": "./bin/mcp-server.js"
+    "contentful-graphql-mcp-server": "bin/mcp-server.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "build": "node build.js && chmod +x bin/mcp-server.js",
