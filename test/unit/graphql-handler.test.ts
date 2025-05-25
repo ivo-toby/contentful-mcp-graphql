@@ -87,9 +87,6 @@ describe("GraphQL Handler Unit Tests", () => {
     })
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query {
           entries {
@@ -124,6 +121,58 @@ describe("GraphQL Handler Unit Tests", () => {
     expect(parsedContent.data.entries[0]).to.have.property("title", "Test Entry 1")
   })
 
+  it("should execute a GraphQL query with optional spaceId and environmentId overrides", async () => {
+    // Mock successful fetch response for entries query
+    const mockEntriesResponse = {
+      data: {
+        entries: [{ id: "entry1", title: "Test Entry 1", content: "This is test content" }],
+      },
+    }
+
+    // Configure mock fetch to return successful response
+    vi.mocked(fetch).mockImplementationOnce(async (url, options) => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => mockEntriesResponse,
+      } as any
+    })
+
+    const result = await graphqlHandlers.executeQuery({
+      spaceId: "override-space-id",
+      environmentId: "override-env",
+      query: `
+        query {
+          entries {
+            id
+            title
+            content
+          }
+        }
+      `,
+    })
+
+    // Check that fetch was called with overridden parameters
+    expect(fetch).toHaveBeenCalledWith(
+      "https://graphql.contentful.com/content/v1/spaces/override-space-id/environments/override-env",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-token",
+        }),
+      }),
+    )
+
+    // Verify result formatting
+    expect(result).to.have.property("content").that.is.an("array")
+    expect(result.content).to.have.lengthOf(1)
+
+    const parsedContent = JSON.parse(result.content[0].text)
+    expect(parsedContent).to.have.property("data")
+    expect(parsedContent.data).to.have.property("entries").that.is.an("array")
+  })
+
   it.skip("should execute a GraphQL query with variables", async () => {
     // Mock successful fetch response for assets query
     const mockAssetsResponse = {
@@ -153,9 +202,6 @@ describe("GraphQL Handler Unit Tests", () => {
     })
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query GetAssets($limit: Int) {
           assets(limit: $limit) {
@@ -209,9 +255,6 @@ describe("GraphQL Handler Unit Tests", () => {
     })
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query {
           invalidField { # This should fail validation
@@ -246,9 +289,6 @@ describe("GraphQL Handler Unit Tests", () => {
     })
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query {
           entries {
@@ -287,9 +327,6 @@ describe("GraphQL Handler Unit Tests", () => {
     })
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query {
           entries {
@@ -341,11 +378,7 @@ describe("GraphQL Handler Unit Tests", () => {
         } as any
       })
 
-      const result = await graphqlHandlers.listContentTypes({
-        spaceId: "test-space-id",
-        environmentId: "master",
-        cdaToken: "test-token",
-      })
+      const result = await graphqlHandlers.listContentTypes({})
 
       // Verify result format
       expect(result).to.have.property("content").that.is.an("array")
@@ -361,6 +394,59 @@ describe("GraphQL Handler Unit Tests", () => {
       expect(parsedContent.contentTypes[1].name).to.equal("product")
     })
 
+    it("should list content types with optional overrides", async () => {
+      // Mock schema response for content type listing
+      const mockContentTypesResponse = {
+        data: {
+          __schema: {
+            queryType: {
+              fields: [
+                {
+                  name: "articleCollection",
+                  description: "Article Collection",
+                  type: { kind: "OBJECT", ofType: null },
+                },
+              ],
+            },
+          },
+        },
+      }
+
+      // Mock successful response
+      vi.mocked(fetch).mockImplementationOnce(async () => {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockContentTypesResponse,
+        } as any
+      })
+
+      const result = await graphqlHandlers.listContentTypes({
+        spaceId: "override-space",
+        environmentId: "override-env",
+      })
+
+      // Check that fetch was called with overridden parameters
+      expect(fetch).toHaveBeenCalledWith(
+        "https://graphql.contentful.com/content/v1/spaces/override-space/environments/override-env",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "Content-Type": "application/json",
+            Authorization: "Bearer test-token",
+          }),
+        }),
+      )
+
+      // Verify result format
+      expect(result).to.have.property("content").that.is.an("array")
+      expect(result.content).to.have.lengthOf(1)
+
+      const parsedContent = JSON.parse(result.content[0].text)
+      expect(parsedContent).to.have.property("message")
+      expect(parsedContent).to.have.property("contentTypes").that.is.an("array")
+    })
+
     it("should handle errors when listing content types", async () => {
       // Mock error response
       vi.mocked(fetch).mockImplementationOnce(async () => {
@@ -371,11 +457,7 @@ describe("GraphQL Handler Unit Tests", () => {
         } as any
       })
 
-      const result = await graphqlHandlers.listContentTypes({
-        spaceId: "test-space-id",
-        environmentId: "master",
-        cdaToken: "test-token",
-      })
+      const result = await graphqlHandlers.listContentTypes({})
 
       expect(result).to.have.property("isError", true)
       expect(result.content[0].text).to.include("HTTP Error 401")
@@ -415,9 +497,6 @@ describe("GraphQL Handler Unit Tests", () => {
 
       const result = await graphqlHandlers.getContentTypeSchema({
         contentType: "Article",
-        spaceId: "test-space-id",
-        environmentId: "master",
-        cdaToken: "test-token",
       })
 
       // Verify result format
@@ -434,6 +513,59 @@ describe("GraphQL Handler Unit Tests", () => {
       expect(parsedContent.fields[0].name).to.equal("title")
       expect(parsedContent.fields[0].type).to.equal("String")
       expect(parsedContent.fields[1].name).to.equal("body")
+    })
+
+    it("should get content type schema with optional overrides", async () => {
+      // Mock schema response for a content type
+      const mockContentTypeResponse = {
+        data: {
+          __type: {
+            name: "Article",
+            description: "Article content type",
+            fields: [
+              {
+                name: "title",
+                description: "Article title",
+                type: { kind: "SCALAR", name: "String", ofType: null },
+              },
+            ],
+          },
+        },
+      }
+
+      // Mock successful response
+      vi.mocked(fetch).mockImplementationOnce(async () => {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockContentTypeResponse,
+        } as any
+      })
+
+      const result = await graphqlHandlers.getContentTypeSchema({
+        contentType: "Article",
+        spaceId: "override-space",
+        environmentId: "override-env",
+      })
+
+      // Check that fetch was called with overridden parameters
+      expect(fetch).toHaveBeenCalledWith(
+        "https://graphql.contentful.com/content/v1/spaces/override-space/environments/override-env",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "Content-Type": "application/json",
+            Authorization: "Bearer test-token",
+          }),
+        }),
+      )
+
+      // Verify result format
+      expect(result).to.have.property("content").that.is.an("array")
+      expect(result.content).to.have.lengthOf(1)
+
+      const parsedContent = JSON.parse(result.content[0].text)
+      expect(parsedContent).to.have.property("contentType", "Article")
     })
 
     it("should handle non-existent content type and try with Collection suffix", async () => {
@@ -471,9 +603,6 @@ describe("GraphQL Handler Unit Tests", () => {
 
       const result = await graphqlHandlers.getContentTypeSchema({
         contentType: "Article", // Will try ArticleCollection when Article not found
-        spaceId: "test-space-id",
-        environmentId: "master",
-        cdaToken: "test-token",
       })
 
       expect(result).to.have.property("content").that.is.an("array")
@@ -506,9 +635,6 @@ describe("GraphQL Handler Unit Tests", () => {
 
       const result = await graphqlHandlers.getExample({
         contentType: "Article",
-        spaceId: "test-space-id",
-        environmentId: "master",
-        cdaToken: "test-token",
       })
 
       // Restore original function
@@ -522,6 +648,45 @@ describe("GraphQL Handler Unit Tests", () => {
       expect(result.content[0].text).to.include("limit")
     })
 
+    it("should generate example queries with optional overrides", async () => {
+      // Mock the getContentTypeSchema call so we don't have to mock fetch again
+      const originalGetContentTypeSchema = graphqlHandlers.getContentTypeSchema
+      graphqlHandlers.getContentTypeSchema = vi.fn().mockResolvedValue({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              contentType: "ArticleCollection",
+              description: "Collection of Articles",
+              fields: [
+                { name: "items", type: "[Article]" },
+                { name: "limit", type: "Int" },
+              ],
+            }),
+          },
+        ],
+      })
+
+      const result = await graphqlHandlers.getExample({
+        contentType: "Article",
+        spaceId: "override-space",
+        environmentId: "override-env",
+      })
+
+      // Verify that getContentTypeSchema was called with the overrides
+      expect(graphqlHandlers.getContentTypeSchema).toHaveBeenCalledWith({
+        contentType: "Article",
+        spaceId: "override-space",
+        environmentId: "override-env",
+      })
+
+      // Restore original function
+      graphqlHandlers.getContentTypeSchema = originalGetContentTypeSchema
+
+      expect(result).to.have.property("content").that.is.an("array")
+      expect(result.content[0].text).to.include("Example query for ArticleCollection")
+    })
+
     it("should handle errors in example query generation", async () => {
       // Mock the getContentTypeSchema call to return an error
       const originalGetContentTypeSchema = graphqlHandlers.getContentTypeSchema
@@ -532,9 +697,6 @@ describe("GraphQL Handler Unit Tests", () => {
 
       const result = await graphqlHandlers.getExample({
         contentType: "NonExistentType",
-        spaceId: "test-space-id",
-        environmentId: "master",
-        cdaToken: "test-token",
       })
 
       // Restore original function

@@ -167,9 +167,6 @@ describe("GraphQL Handler Integration Tests", () => {
     )
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query {
           entries {
@@ -222,9 +219,6 @@ describe("GraphQL Handler Integration Tests", () => {
     )
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query GetAssets {
           assets {
@@ -256,9 +250,6 @@ describe("GraphQL Handler Integration Tests", () => {
     // No need to override MSW as the validation happens before the request
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query {
           invalidField { # This should fail validation
