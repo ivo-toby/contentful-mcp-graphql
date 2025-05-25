@@ -6,7 +6,8 @@ import { buildClientSchema, getIntrospectionQuery, validate, parse, GraphQLSchem
 let graphqlSchema: GraphQLSchema | null = null
 
 // Store content types and schemas in memory for fast access
-let contentTypesCache: Array<{name: string, queryName: string, description?: string}> | null = null
+let contentTypesCache: Array<{ name: string; queryName: string; description?: string }> | null =
+  null
 let contentTypeSchemasCache: Map<string, any> = new Map()
 let lastCacheUpdate: Date | null = null
 
@@ -177,12 +178,12 @@ export async function loadContentfulMetadata(
   accessToken: string,
 ): Promise<void> {
   try {
-    console.error('Loading Contentful metadata into cache...')
+    console.error("Loading Contentful metadata into cache...")
 
     // Load content types using the existing handler but bypass the cache check
     const contentTypesResult = await loadContentTypesFromAPI(spaceId, environmentId, accessToken)
     if (contentTypesResult.isError) {
-      console.error('Failed to load content types:', contentTypesResult.content[0].text)
+      console.error("Failed to load content types:", contentTypesResult.content[0].text)
       return
     }
 
@@ -202,7 +203,7 @@ export async function loadContentfulMetadata(
           )
           if (!schemaResult.isError) {
             const parsedSchema = JSON.parse(schemaResult.content[0].text)
-            contentTypeSchemasCache.set(ct.name, parsedSchema)
+            contentTypeSchemasCache.set(parsedSchema.contentType, parsedSchema)
           }
         } catch (error) {
           console.error(`Failed to load schema for ${ct.name}:`, error)
@@ -214,14 +215,18 @@ export async function loadContentfulMetadata(
     }
 
     lastCacheUpdate = new Date()
-    console.error('Contentful metadata cache loaded successfully')
+    console.error("Contentful metadata cache loaded successfully")
   } catch (error) {
-    console.error('Error loading Contentful metadata:', error)
+    console.error("Error loading Contentful metadata:", error)
   }
 }
 
 // Get cached content types
-export function getCachedContentTypes(): Array<{name: string, queryName: string, description?: string}> | null {
+export function getCachedContentTypes(): Array<{
+  name: string
+  queryName: string
+  description?: string
+}> | null {
   return contentTypesCache
 }
 
@@ -236,13 +241,25 @@ export function isCacheAvailable(): boolean {
 }
 
 // Get cache status
-export function getCacheStatus(): { available: boolean, contentTypesCount: number, schemasCount: number, lastUpdate: Date | null } {
+export function getCacheStatus(): {
+  available: boolean
+  contentTypesCount: number
+  schemasCount: number
+  lastUpdate: Date | null
+} {
   return {
     available: isCacheAvailable(),
     contentTypesCount: contentTypesCache?.length || 0,
     schemasCount: contentTypeSchemasCache.size,
     lastUpdate: lastCacheUpdate,
   }
+}
+
+// Clear cache (for testing purposes)
+export function clearCache(): void {
+  contentTypesCache = null
+  contentTypeSchemasCache.clear()
+  lastCacheUpdate = null
 }
 
 // Interface for GraphQL query arguments
@@ -282,9 +299,9 @@ async function loadContentTypesFromAPI(
   `
 
   const response = await fetch(endpoint, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ query }),
@@ -293,7 +310,7 @@ async function loadContentTypesFromAPI(
   if (!response.ok) {
     const errorText = await response.text()
     return {
-      content: [{ type: 'text', text: `HTTP Error ${response.status}: ${errorText}` }],
+      content: [{ type: "text", text: `HTTP Error ${response.status}: ${errorText}` }],
       isError: true,
     }
   }
@@ -302,7 +319,7 @@ async function loadContentTypesFromAPI(
 
   if (result.errors) {
     return {
-      content: [{ type: 'text', text: JSON.stringify({ errors: result.errors }, null, 2) }],
+      content: [{ type: "text", text: JSON.stringify({ errors: result.errors }, null, 2) }],
       isError: true,
     }
   }
@@ -310,11 +327,11 @@ async function loadContentTypesFromAPI(
   const contentTypeFields = result.data.__schema.queryType.fields
     .filter(
       (field: any) =>
-        field.name.endsWith('Collection') ||
-        (field.type?.kind === 'OBJECT' && field.type?.name?.endsWith('Collection')),
+        field.name.endsWith("Collection") ||
+        (field.type?.kind === "OBJECT" && field.type?.name?.endsWith("Collection")),
     )
     .map((field: any) => ({
-      name: field.name.replace('Collection', ''),
+      name: field.name.replace("Collection", ""),
       description: field.description || `Content type for ${field.name}`,
       queryName: field.name,
     }))
@@ -322,11 +339,11 @@ async function loadContentTypesFromAPI(
   return {
     content: [
       {
-        type: 'text',
+        type: "text",
         text: JSON.stringify(
           {
             message:
-              'Available content types in this Contentful space. Use graphql_get_content_type_schema to explore a specific content type.',
+              "Available content types in this Contentful space. Use graphql_get_content_type_schema to explore a specific content type.",
             contentTypes: contentTypeFields,
           },
           null,
@@ -371,9 +388,9 @@ async function loadContentTypeSchemaFromAPI(
   `
 
   const response = await fetch(endpoint, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ query }),
@@ -382,7 +399,7 @@ async function loadContentTypeSchemaFromAPI(
   if (!response.ok) {
     const errorText = await response.text()
     return {
-      content: [{ type: 'text', text: `HTTP Error ${response.status}: ${errorText}` }],
+      content: [{ type: "text", text: `HTTP Error ${response.status}: ${errorText}` }],
       isError: true,
     }
   }
@@ -391,19 +408,24 @@ async function loadContentTypeSchemaFromAPI(
 
   if (result.errors) {
     return {
-      content: [{ type: 'text', text: JSON.stringify({ errors: result.errors }, null, 2) }],
+      content: [{ type: "text", text: JSON.stringify({ errors: result.errors }, null, 2) }],
       isError: true,
     }
   }
 
   if (!result.data.__type) {
-    if (!contentType.endsWith('Collection')) {
-      return loadContentTypeSchemaFromAPI(`${contentType}Collection`, spaceId, environmentId, accessToken)
+    if (!contentType.endsWith("Collection")) {
+      return loadContentTypeSchemaFromAPI(
+        `${contentType}Collection`,
+        spaceId,
+        environmentId,
+        accessToken,
+      )
     }
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: `Content type "${contentType}" not found in the schema.`,
         },
       ],
@@ -421,13 +443,13 @@ async function loadContentTypeSchemaFromAPI(
   return {
     content: [
       {
-        type: 'text',
+        type: "text",
         text: JSON.stringify(
           {
             contentType: result.data.__type.name,
             description: result.data.__type.description,
             fields,
-            note: 'Use this schema to construct your GraphQL queries. For example queries, use the graphql_get_example tool.',
+            note: "Use this schema to construct your GraphQL queries. For example queries, use the graphql_get_example tool.",
           },
           null,
           2,
@@ -473,7 +495,12 @@ export const graphqlHandlers = {
 
       if (!spaceId) {
         return {
-          content: [{ type: "text", text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)" }],
+          content: [
+            {
+              type: "text",
+              text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)",
+            },
+          ],
           isError: true,
         }
       }
@@ -560,7 +587,12 @@ export const graphqlHandlers = {
 
       if (!spaceId) {
         return {
-          content: [{ type: "text", text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)" }],
+          content: [
+            {
+              type: "text",
+              text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)",
+            },
+          ],
           isError: true,
         }
       }
@@ -577,7 +609,12 @@ export const graphqlHandlers = {
         }
       }
 
-      return await loadContentTypeSchemaFromAPI(args.contentType, spaceId, environmentId, accessToken)
+      return await loadContentTypeSchemaFromAPI(
+        args.contentType,
+        spaceId,
+        environmentId,
+        accessToken,
+      )
     } catch (error) {
       return {
         content: [
@@ -705,7 +742,12 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
 
       if (!spaceId) {
         return {
-          content: [{ type: "text", text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)" }],
+          content: [
+            {
+              type: "text",
+              text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)",
+            },
+          ],
           isError: true,
         }
       }
@@ -897,7 +939,7 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
 
       // Filter content types if specified
       const targetContentTypes = args.contentTypes
-        ? contentTypes.filter(ct => args.contentTypes!.includes(ct.name))
+        ? contentTypes.filter((ct) => args.contentTypes!.includes(ct.name))
         : contentTypes
 
       const searchPromises = targetContentTypes.map(async (contentType) => {
@@ -910,16 +952,16 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
           if (textFields.length === 0) return null
 
           // Build search query with OR conditions across text fields
-          const searchConditions = textFields.map((field: any) => 
-            `{ ${field.name}_contains: $searchTerm }`
-          ).join(', ')
+          const searchConditions = textFields
+            .map((field: any) => `{ ${field.name}_contains: $searchTerm }`)
+            .join(", ")
 
           const query = `
             query SearchIn${contentType.name}($searchTerm: String!) {
               ${contentType.queryName}(where: { OR: [${searchConditions}] }, limit: ${limit}) {
                 items {
                   sys { id }
-                  ${textFields.map((field: any) => field.name).join('\n                  ')}
+                  ${textFields.map((field: any) => field.name).join("\n                  ")}
                 }
               }
             }
@@ -941,9 +983,9 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
                 items: items.map((item: any) => ({
                   id: item.sys.id,
                   ...Object.fromEntries(
-                    textFields.map((field: any) => [field.name, item[field.name]])
+                    textFields.map((field: any) => [field.name, item[field.name]]),
                   ),
-                }))
+                })),
               }
             }
           }
@@ -1021,11 +1063,25 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
 
       const actualSchema = schema || getCachedContentTypeSchema(`${args.contentType}Collection`)
       const contentTypeName = actualSchema.contentType
-      const queryName = contentTypeName.endsWith('Collection') ? contentTypeName : `${contentTypeName}Collection`
+
+      // Find the correct query name from cached content types
+      const cachedContentTypes = getCachedContentTypes()
+      const contentTypeInfo = cachedContentTypes?.find(
+        (ct) =>
+          ct.name === args.contentType ||
+          ct.name === contentTypeName ||
+          ct.queryName === contentTypeName,
+      )
+
+      const queryName =
+        contentTypeInfo?.queryName ||
+        (contentTypeName.endsWith("Collection") ? contentTypeName : `${contentTypeName}Collection`)
 
       // Determine which fields to search
-      let fieldsToSearch = actualSchema.fields.filter((field: any) => isSearchableTextField(field.type))
-      
+      let fieldsToSearch = actualSchema.fields.filter((field: any) =>
+        isSearchableTextField(field.type),
+      )
+
       if (args.fields && args.fields.length > 0) {
         // Use only specified fields that are also searchable
         fieldsToSearch = fieldsToSearch.filter((field: any) => args.fields!.includes(field.name))
@@ -1036,7 +1092,7 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
           content: [
             {
               type: "text",
-              text: `No searchable text fields found for content type "${args.contentType}". Available fields: ${actualSchema.fields.map((f: any) => f.name).join(', ')}`,
+              text: `No searchable text fields found for content type "${args.contentType}". Available fields: ${actualSchema.fields.map((f: any) => f.name).join(", ")}`,
             },
           ],
           isError: true,
@@ -1044,33 +1100,29 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
       }
 
       // Build search conditions
-      const searchConditions = fieldsToSearch.map((field: any) => 
-        `{ ${field.name}_contains: $searchTerm }`
-      ).join(', ')
+      const searchConditions = fieldsToSearch
+        .map((field: any) => `{ ${field.name}_contains: $searchTerm }`)
+        .join(", ")
 
       // Get all fields for selection (scalars only for simplicity)
       const scalarFields = actualSchema.fields
         .filter((field: any) => isScalarType(field.type))
         .map((field: any) => field.name)
 
-      const query = `query Search${contentTypeName.replace('Collection', '')}($searchTerm: String!) {
+      const query = `query Search${contentTypeName.replace("Collection", "")}($searchTerm: String!) {
   ${queryName}(where: { OR: [${searchConditions}] }, limit: 10) {
     items {
       sys { id }
-${scalarFields.map(field => `      ${field}`).join('\n')}
+${scalarFields.map((field: any) => `      ${field}`).join("\n")}
     }
   }
 }`
-
-      const variables = {
-        searchTerm: args.searchTerm
-      }
 
       return {
         content: [
           {
             type: "text",
-            text: `# Generated search query for ${args.contentType}\n\n${query}\n\n# Variables:\n${JSON.stringify(variables, null, 2)}\n\n# Searchable fields used:\n${fieldsToSearch.map((f: any) => `- ${f.name} (${f.type})`).join('\n')}`,
+            text: query,
           },
         ],
       }
@@ -1112,7 +1164,7 @@ function isScalarType(typeString: string): boolean {
 
 function isSearchableTextField(typeString: string): boolean {
   // Text fields that support _contains search
-  return typeString.includes("String") && !typeString.includes("!")
+  return typeString === "String"
 }
 
 function isReferenceType(typeString: string): boolean {

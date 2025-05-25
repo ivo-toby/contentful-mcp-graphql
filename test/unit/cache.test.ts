@@ -1,21 +1,24 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import {
   loadContentfulMetadata,
   getCachedContentTypes,
   getCachedContentTypeSchema,
   isCacheAvailable,
   getCacheStatus,
-} from '../../src/handlers/graphql-handlers.js'
+  clearCache,
+} from "../../src/handlers/graphql-handlers.js"
 
-// Mock fetch
-const mockFetch = vi.fn()
-vi.stubGlobal('fetch', mockFetch)
+// Mock undici fetch instead of global fetch
+const mockFetch = vi.hoisted(() => vi.fn())
+vi.mock("undici", () => ({
+  fetch: mockFetch,
+}))
 
-describe('Contentful Cache', () => {
+describe("Contentful Cache", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset cache state
-    vi.resetModules()
+    // Clear cache state
+    clearCache()
   })
 
   const mockContentTypesResponse = {
@@ -24,66 +27,74 @@ describe('Contentful Cache', () => {
         queryType: {
           fields: [
             {
-              name: 'pageArticleCollection',
-              description: 'Page Article Collection',
-              type: { kind: 'OBJECT', ofType: { name: 'PageArticleCollection', kind: 'OBJECT' } }
+              name: "pageArticleCollection",
+              description: "Page Article Collection",
+              type: { kind: "OBJECT", ofType: { name: "PageArticleCollection", kind: "OBJECT" } },
             },
             {
-              name: 'topicCategoryCollection', 
-              description: 'Topic Category Collection',
-              type: { kind: 'OBJECT', ofType: { name: 'TopicCategoryCollection', kind: 'OBJECT' } }
-            }
-          ]
-        }
-      }
-    }
+              name: "topicCategoryCollection",
+              description: "Topic Category Collection",
+              type: { kind: "OBJECT", ofType: { name: "TopicCategoryCollection", kind: "OBJECT" } },
+            },
+          ],
+        },
+      },
+    },
   }
 
   const mockPageArticleSchema = {
     data: {
       __type: {
-        name: 'PageArticle',
-        description: 'Page Article content type',
+        name: "PageArticle",
+        description: "Page Article content type",
         fields: [
-          { name: 'sys', description: 'System fields', type: { kind: 'NON_NULL', ofType: { name: 'Sys' } } },
-          { name: 'title', description: 'Title field', type: { kind: 'SCALAR', name: 'String' } },
-          { name: 'slug', description: 'Slug field', type: { kind: 'SCALAR', name: 'String' } },
-        ]
-      }
-    }
+          {
+            name: "sys",
+            description: "System fields",
+            type: { kind: "NON_NULL", ofType: { name: "Sys" } },
+          },
+          { name: "title", description: "Title field", type: { kind: "SCALAR", name: "String" } },
+          { name: "slug", description: "Slug field", type: { kind: "SCALAR", name: "String" } },
+        ],
+      },
+    },
   }
 
   const mockTopicCategorySchema = {
     data: {
       __type: {
-        name: 'TopicCategory',
-        description: 'Topic Category content type', 
+        name: "TopicCategory",
+        description: "Topic Category content type",
         fields: [
-          { name: 'sys', description: 'System fields', type: { kind: 'NON_NULL', ofType: { name: 'Sys' } } },
-          { name: 'name', description: 'Name field', type: { kind: 'SCALAR', name: 'String' } },
-        ]
-      }
-    }
+          {
+            name: "sys",
+            description: "System fields",
+            type: { kind: "NON_NULL", ofType: { name: "Sys" } },
+          },
+          { name: "name", description: "Name field", type: { kind: "SCALAR", name: "String" } },
+        ],
+      },
+    },
   }
 
-  it('should load content types and schemas into cache', async () => {
+  it("should load content types and schemas into cache", async () => {
     // Mock the content types response
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockContentTypesResponse
+        json: async () => mockContentTypesResponse,
       })
       // Mock schema responses
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockPageArticleSchema
+        json: async () => mockPageArticleSchema,
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockTopicCategorySchema
+        json: async () => mockTopicCategorySchema,
       })
 
-    await loadContentfulMetadata('test-space', 'master', 'test-token')
+    await loadContentfulMetadata("test-space", "master", "test-token")
 
     // Check that cache is available
     expect(isCacheAvailable()).toBe(true)
@@ -92,33 +103,33 @@ describe('Contentful Cache', () => {
     const contentTypes = getCachedContentTypes()
     expect(contentTypes).toHaveLength(2)
     expect(contentTypes![0]).toEqual({
-      name: 'pageArticle',
-      description: 'Page Article Collection',
-      queryName: 'pageArticleCollection'
+      name: "pageArticle",
+      description: "Page Article Collection",
+      queryName: "pageArticleCollection",
     })
 
     // Check cached schemas
-    const pageArticleSchema = getCachedContentTypeSchema('pageArticle')
+    const pageArticleSchema = getCachedContentTypeSchema("PageArticle")
     expect(pageArticleSchema).toBeDefined()
-    expect(pageArticleSchema.contentType).toBe('PageArticle')
+    expect(pageArticleSchema.contentType).toBe("PageArticle")
     expect(pageArticleSchema.fields).toHaveLength(3)
   })
 
-  it('should handle API errors gracefully', async () => {
+  it("should handle API errors gracefully", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
-      text: async () => 'Unauthorized'
+      text: async () => "Unauthorized",
     })
 
-    await loadContentfulMetadata('test-space', 'master', 'invalid-token')
+    await loadContentfulMetadata("test-space", "master", "invalid-token")
 
     // Cache should not be available after error
     expect(isCacheAvailable()).toBe(false)
     expect(getCachedContentTypes()).toBeNull()
   })
 
-  it('should provide accurate cache status', async () => {
+  it("should provide accurate cache status", async () => {
     // Initially cache should be empty
     const initialStatus = getCacheStatus()
     expect(initialStatus.available).toBe(false)
@@ -130,18 +141,18 @@ describe('Contentful Cache', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockContentTypesResponse
+        json: async () => mockContentTypesResponse,
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockPageArticleSchema
+        json: async () => mockPageArticleSchema,
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockTopicCategorySchema
+        json: async () => mockTopicCategorySchema,
       })
 
-    await loadContentfulMetadata('test-space', 'master', 'test-token')
+    await loadContentfulMetadata("test-space", "master", "test-token")
 
     // Check updated status
     const updatedStatus = getCacheStatus()
@@ -151,53 +162,53 @@ describe('Contentful Cache', () => {
     expect(updatedStatus.lastUpdate).toBeInstanceOf(Date)
   })
 
-  it('should handle missing content types in schema response', async () => {
+  it("should handle missing content types in schema response", async () => {
     const emptyResponse = {
       data: {
         __schema: {
           queryType: {
-            fields: []
-          }
-        }
-      }
+            fields: [],
+          },
+        },
+      },
     }
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => emptyResponse
+      json: async () => emptyResponse,
     })
 
-    await loadContentfulMetadata('test-space', 'master', 'test-token')
+    await loadContentfulMetadata("test-space", "master", "test-token")
 
     const contentTypes = getCachedContentTypes()
     expect(contentTypes).toHaveLength(0)
   })
 
-  it('should continue loading other schemas if one fails', async () => {
+  it("should continue loading other schemas if one fails", async () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockContentTypesResponse
+        json: async () => mockContentTypesResponse,
       })
       // First schema succeeds
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockPageArticleSchema
+        json: async () => mockPageArticleSchema,
       })
       // Second schema fails
       .mockResolvedValueOnce({
         ok: false,
         status: 404,
-        text: async () => 'Not Found'
+        text: async () => "Not Found",
       })
 
-    await loadContentfulMetadata('test-space', 'master', 'test-token')
+    await loadContentfulMetadata("test-space", "master", "test-token")
 
     // Should have content types loaded
     expect(getCachedContentTypes()).toHaveLength(2)
-    
+
     // Should have only one schema (the successful one)
-    expect(getCachedContentTypeSchema('pageArticle')).toBeDefined()
-    expect(getCachedContentTypeSchema('topicCategory')).toBeNull()
+    expect(getCachedContentTypeSchema("pageArticle")).toBeDefined()
+    expect(getCachedContentTypeSchema("topicCategory")).toBeNull()
   })
 })

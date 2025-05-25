@@ -1,0 +1,18 @@
+{
+  "data": {
+    "__type": {
+      "name": "PageArticle",
+      "description": "Page Article content type",
+      "fields": [
+        {
+          "name": "sys",
+          "description": "System fields",
+          "type": { "kind": "NON_NULL", "ofType": { "name": "Sys" } }
+        },
+        { "name": "title", "description": "Title field", "type": { "kind": "SCALAR", "name": "String" } },
+        { "name": "internalName", "description": "Internal name", "type": { "kind": "SCALAR", "name": "String" } },
+        { "name": "slug", "description": "Slug field", "type": { "kind": "SCALAR", "name": "String" } }
+      ]
+    }
+  }
+}

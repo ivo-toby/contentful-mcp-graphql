@@ -1,1 +1,240 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'\nimport { graphqlHandlers } from '../../src/handlers/graphql-handlers.js'\n\n// Mock the cache functions\nconst mockIsCacheAvailable = vi.fn()\nconst mockGetCachedContentTypeSchema = vi.fn()\n\nvi.mock('../../src/handlers/graphql-handlers.js', async () => {\n  const actual = await vi.importActual('../../src/handlers/graphql-handlers.js')\n  return {\n    ...actual,\n    isCacheAvailable: mockIsCacheAvailable,\n    getCachedContentTypeSchema: mockGetCachedContentTypeSchema,\n  }\n})\n\ndescribe('Build Search Query', () => {\n  beforeEach(() => {\n    vi.clearAllMocks()\n  })\n\n  const mockSchema = {\n    contentType: 'PageArticle',\n    fields: [\n      { name: 'sys', type: 'Sys!', description: 'System fields' },\n      { name: 'title', type: 'String', description: 'Title field' },\n      { name: 'internalName', type: 'String', description: 'Internal name' },\n      { name: 'slug', type: 'String', description: 'URL slug' },\n      { name: 'publishedDate', type: 'DateTime', description: 'Published date' }\n    ]\n  }\n\n  it('should build a search query for a content type', async () => {\n    mockIsCacheAvailable.mockReturnValue(true)\n    mockGetCachedContentTypeSchema.mockReturnValue(mockSchema)\n\n    const result = await graphqlHandlers.buildSearchQuery({\n      contentType: 'PageArticle',\n      searchTerm: 'address'\n    })\n\n    expect(result.isError).toBeFalsy()\n    const queryText = result.content[0].text\n    \n    // Should contain the query structure\n    expect(queryText).toContain('query SearchPageArticle($searchTerm: String!)')\n    expect(queryText).toContain('pageArticleCollection(where: { OR: [')\n    expect(queryText).toContain('{ title_contains: $searchTerm }')\n    expect(queryText).toContain('{ internalName_contains: $searchTerm }')\n    expect(queryText).toContain('{ slug_contains: $searchTerm }')\n    \n    // Should include variables\n    expect(queryText).toContain('\"searchTerm\": \"address\"')\n    \n    // Should list searchable fields\n    expect(queryText).toContain('- title (String)')\n    expect(queryText).toContain('- internalName (String)')\n    expect(queryText).toContain('- slug (String)')\n  })\n\n  it('should handle content type with Collection suffix', async () => {\n    const collectionSchema = {\n      ...mockSchema,\n      contentType: 'PageArticleCollection'\n    }\n    \n    mockIsCacheAvailable.mockReturnValue(true)\n    mockGetCachedContentTypeSchema\n      .mockReturnValueOnce(null) // First call for 'PageArticle'\n      .mockReturnValueOnce(collectionSchema) // Second call for 'PageArticleCollection'\n\n    const result = await graphqlHandlers.buildSearchQuery({\n      contentType: 'PageArticle',\n      searchTerm: 'test'\n    })\n\n    expect(result.isError).toBeFalsy()\n    expect(result.content[0].text).toContain('PageArticleCollection')\n  })\n\n  it('should filter to specific fields when provided', async () => {\n    mockIsCacheAvailable.mockReturnValue(true)\n    mockGetCachedContentTypeSchema.mockReturnValue(mockSchema)\n\n    const result = await graphqlHandlers.buildSearchQuery({\n      contentType: 'PageArticle',\n      searchTerm: 'test',\n      fields: ['title', 'slug']\n    })\n\n    expect(result.isError).toBeFalsy()\n    const queryText = result.content[0].text\n    \n    // Should only include specified fields\n    expect(queryText).toContain('{ title_contains: $searchTerm }')\n    expect(queryText).toContain('{ slug_contains: $searchTerm }')\n    expect(queryText).not.toContain('{ internalName_contains: $searchTerm }')\n  })\n\n  it('should handle cache not available', async () => {\n    mockIsCacheAvailable.mockReturnValue(false)\n\n    const result = await graphqlHandlers.buildSearchQuery({\n      contentType: 'PageArticle',\n      searchTerm: 'test'\n    })\n\n    expect(result.isError).toBe(true)\n    expect(result.content[0].text).toContain('Query builder requires cached metadata')\n  })\n\n  it('should handle content type not found', async () => {\n    mockIsCacheAvailable.mockReturnValue(true)\n    mockGetCachedContentTypeSchema.mockReturnValue(null)\n\n    const result = await graphqlHandlers.buildSearchQuery({\n      contentType: 'NonExistentType',\n      searchTerm: 'test'\n    })\n\n    expect(result.isError).toBe(true)\n    expect(result.content[0].text).toContain('Content type \"NonExistentType\" not found in cache')\n  })\n\n  it('should handle content type with no searchable fields', async () => {\n    const schemaWithNoTextFields = {\n      contentType: 'Asset',\n      fields: [\n        { name: 'sys', type: 'Sys!', description: 'System fields' },\n        { name: 'width', type: 'Int', description: 'Width in pixels' },\n        { name: 'height', type: 'Int', description: 'Height in pixels' }\n      ]\n    }\n\n    mockIsCacheAvailable.mockReturnValue(true)\n    mockGetCachedContentTypeSchema.mockReturnValue(schemaWithNoTextFields)\n\n    const result = await graphqlHandlers.buildSearchQuery({\n      contentType: 'Asset',\n      searchTerm: 'test'\n    })\n\n    expect(result.isError).toBe(true)\n    expect(result.content[0].text).toContain('No searchable text fields found')\n    expect(result.content[0].text).toContain('Available fields: sys, width, height')\n  })\n\n  it('should handle specified fields that are not searchable', async () => {\n    mockIsCacheAvailable.mockReturnValue(true)\n    mockGetCachedContentTypeSchema.mockReturnValue(mockSchema)\n\n    const result = await graphqlHandlers.buildSearchQuery({\n      contentType: 'PageArticle',\n      searchTerm: 'test',\n      fields: ['publishedDate', 'sys'] // Non-searchable fields\n    })\n\n    expect(result.isError).toBe(true)\n    expect(result.content[0].text).toContain('No searchable text fields found')\n  })\n\n  it('should include all scalar fields in selection', async () => {\n    mockIsCacheAvailable.mockReturnValue(true)\n    mockGetCachedContentTypeSchema.mockReturnValue(mockSchema)\n\n    const result = await graphqlHandlers.buildSearchQuery({\n      contentType: 'PageArticle',\n      searchTerm: 'test'\n    })\n\n    expect(result.isError).toBeFalsy()\n    const queryText = result.content[0].text\n    \n    // Should include all scalar fields in the selection\n    expect(queryText).toContain('sys { id }')\n    expect(queryText).toContain('title')\n    expect(queryText).toContain('internalName')\n    expect(queryText).toContain('slug')\n    expect(queryText).toContain('publishedDate')\n  })\n})\n
+import { describe, it, expect, beforeEach, vi } from "vitest"
+import {
+  graphqlHandlers,
+  clearCache,
+  loadContentfulMetadata,
+} from "../../src/handlers/graphql-handlers.js"
+
+// Mock undici fetch - buildSearchQuery doesn't directly call fetch,
+// but underlying cache loaders might if not properly mocked.
+const mockFetch = vi.hoisted(() => vi.fn())
+vi.mock("undici", () => ({
+  fetch: mockFetch,
+}))
+
+// Mock parts of the graphql-handlers module for cache control
+const mockGetCachedContentTypes = vi.hoisted(() => vi.fn())
+const mockGetCachedContentTypeSchema = vi.hoisted(() => vi.fn())
+const mockIsCacheAvailable = vi.hoisted(() => vi.fn())
+
+vi.mock("../../src/handlers/graphql-handlers.js", async () => {
+  const actual = await vi.importActual<typeof import("../../src/handlers/graphql-handlers.js")>(
+    "../../src/handlers/graphql-handlers.js",
+  )
+  return {
+    graphqlHandlers: {
+      ...actual.graphqlHandlers,
+    },
+    isCacheAvailable: mockIsCacheAvailable,
+    getCachedContentTypes: mockGetCachedContentTypes,
+    getCachedContentTypeSchema: mockGetCachedContentTypeSchema,
+    clearCache: actual.clearCache,
+  }
+})
+
+describe("Build Search Query", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearCache()
+
+    mockIsCacheAvailable.mockReturnValue(true)
+    mockGetCachedContentTypes.mockReturnValue(null)
+    mockGetCachedContentTypeSchema.mockReturnValue(null)
+
+    vi.stubEnv("SPACE_ID", "test-space")
+    vi.stubEnv("ENVIRONMENT_ID", "master")
+    vi.stubEnv("CONTENTFUL_DELIVERY_ACCESS_TOKEN", "test-token")
+  })
+
+  const mockPageArticleContentType = {
+    name: "pageArticle",
+    queryName: "pageArticleCollection",
+    description: "Page Article",
+  }
+
+  const mockPageArticleSchemaData = {
+    contentType: "PageArticle",
+    description: "Page Article content type",
+    fields: [
+      { name: "sys", type: "Sys!", description: "System fields" },
+      { name: "title", type: "String", description: "Title field" },
+      { name: "slug", type: "String", description: "URL slug" },
+      { name: "body", type: "String", description: "Body content" },
+      { name: "author", type: "String", description: "Author name" }, // Non-searchable for this test
+      { name: "tags", type: "[String]", description: "Tags" }, // Array, non-searchable
+    ],
+  }
+
+  const mockTestSchemaData = {
+    contentType: "TestType",
+    description: "Test content type",
+    fields: [
+      { name: "stringField", type: "String", description: "Searchable String" },
+      { name: "intField", type: "Int", description: "Int field" },
+      { name: "boolField", type: "Boolean", description: "Boolean field" },
+      { name: "dateField", type: "DateTime", description: "Date field" },
+      { name: "objectField", type: "SomeObject", description: "Object field" },
+      { name: "requiredText", type: "String!", description: "Required String" },
+    ],
+  }
+
+  it("should build a search query for a content type", async () => {
+    mockGetCachedContentTypes.mockReturnValue([mockPageArticleContentType])
+    mockGetCachedContentTypeSchema.mockImplementation((contentTypeName) => {
+      if (contentTypeName === "PageArticle" || contentTypeName === "pageArticle") {
+        return mockPageArticleSchemaData
+      }
+      return null
+    })
+
+    const result = await graphqlHandlers.buildSearchQuery({
+      contentType: "PageArticle",
+      searchTerm: "hello world",
+    })
+
+    expect(result.isError).toBeFalsy()
+    const queryText = result.content[0].text
+
+    expect(queryText).toContain("query SearchPageArticle($searchTerm: String!)")
+    expect(queryText).toContain("pageArticleCollection(where: { OR: [")
+    expect(queryText).toContain("{ title_contains: $searchTerm }")
+    expect(queryText).toContain("{ slug_contains: $searchTerm }")
+
+    // Should include variables
+    expect(queryText).toContain('"searchTerm": "hello world"')
+
+    // Should list searchable fields
+    expect(queryText).toContain("- title (String)")
+    expect(queryText).toContain("- slug (String)")
+  })
+
+  it("should handle content type with Collection suffix", async () => {
+    mockGetCachedContentTypes.mockReturnValue([
+      { name: "pageArticle", queryName: "pageArticleCollection", description: "Page Article" },
+    ])
+    mockGetCachedContentTypeSchema.mockImplementation((contentTypeName) => {
+      if (contentTypeName === "PageArticleCollection") {
+        return {
+          contentType: "PageArticleCollection",
+          fields: mockPageArticleSchemaData.fields,
+        }
+      } else if (contentTypeName === "PageArticle") {
+        return null
+      }
+      return null
+    })
+
+    const result = await graphqlHandlers.buildSearchQuery({
+      contentType: "PageArticle",
+      searchTerm: "test",
+    })
+
+    expect(result.isError).toBeFalsy()
+    expect(result.content[0].text).toContain("PageArticleCollection")
+  })
+
+  it("should filter to specific fields when provided", async () => {
+    mockGetCachedContentTypes.mockReturnValue([mockPageArticleContentType])
+    mockGetCachedContentTypeSchema.mockReturnValue(mockPageArticleSchemaData)
+
+    const result = await graphqlHandlers.buildSearchQuery({
+      contentType: "PageArticle",
+      searchTerm: "test",
+      fields: ["title", "slug"],
+    })
+
+    expect(result.isError).toBeFalsy()
+    const queryText = result.content[0].text
+
+    // Should only include specified fields
+    expect(queryText).toContain("{ title_contains: $searchTerm }")
+    expect(queryText).toContain("{ slug_contains: $searchTerm }")
+    expect(queryText).not.toContain("{ internalName_contains: $searchTerm }")
+  })
+
+  it("should handle cache not available", async () => {
+    mockIsCacheAvailable.mockReturnValue(false)
+
+    const result = await graphqlHandlers.buildSearchQuery({
+      contentType: "PageArticle",
+      searchTerm: "test",
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toContain("Query builder requires cached metadata")
+  })
+
+  it("should handle content type not found", async () => {
+    mockGetCachedContentTypes.mockReturnValue([])
+    mockGetCachedContentTypeSchema.mockReturnValue(null)
+
+    const result = await graphqlHandlers.buildSearchQuery({
+      contentType: "NonExistentType",
+      searchTerm: "test",
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toContain('Content type "NonExistentType" not found in cache')
+  })
+
+  it("should handle content type with no searchable fields", async () => {
+    const assetContentType = { name: "Asset", queryName: "assetCollection", description: "Assets" }
+    const assetSchemaNoSearchable = {
+      contentType: "Asset",
+      fields: [
+        { name: "sys", type: "Sys!" },
+        { name: "width", type: "Int" },
+        { name: "height", type: "Int" },
+      ],
+    }
+    mockGetCachedContentTypes.mockReturnValue([assetContentType])
+    mockGetCachedContentTypeSchema.mockImplementation((contentTypeName) => {
+      if (contentTypeName === "Asset") return assetSchemaNoSearchable
+      return null
+    })
+
+    const result = await graphqlHandlers.buildSearchQuery({
+      contentType: "Asset",
+      searchTerm: "test",
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toContain("No searchable text fields found")
+    expect(result.content[0].text).toContain("Available fields:")
+  })
+
+  it("should handle specified fields that are not searchable", async () => {
+    mockGetCachedContentTypes.mockReturnValue([mockPageArticleContentType])
+    mockGetCachedContentTypeSchema.mockReturnValue(mockPageArticleSchemaData)
+
+    const result = await graphqlHandlers.buildSearchQuery({
+      contentType: "PageArticle",
+      searchTerm: "test",
+      fields: ["author", "tags"],
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toContain("No searchable text fields found")
+  })
+
+  it("should include all scalar fields in selection", async () => {
+    mockGetCachedContentTypes.mockReturnValue([mockPageArticleContentType])
+    mockGetCachedContentTypeSchema.mockReturnValue(mockPageArticleSchemaData)
+
+    const result = await graphqlHandlers.buildSearchQuery({
+      contentType: "PageArticle",
+      searchTerm: "test",
+    })
+
+    expect(result.isError).toBeFalsy()
+    const queryText = result.content[0].text
+
+    // Should include all scalar fields in the selection
+    expect(queryText).toContain("sys { id }")
+    expect(queryText).toContain("title")
+    expect(queryText).toContain("slug")
+    expect(queryText).toContain("body")
+    expect(queryText).toContain("author")
+    expect(queryText).toContain("tags")
+  })
+})

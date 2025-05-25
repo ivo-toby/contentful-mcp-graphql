@@ -1,0 +1,17 @@
+{
+  "data": {
+    "__type": {
+      "name": "TopicCategory",
+      "description": "Topic Category content type",
+      "fields": [
+        {
+          "name": "sys",
+          "description": "System fields",
+          "type": { "kind": "NON_NULL", "ofType": { "name": "Sys" } }
+        },
+        { "name": "name", "description": "Name field", "type": { "kind": "SCALAR", "name": "String" } },
+        { "name": "description", "description": "Description field", "type": { "kind": "SCALAR", "name": "String" } }
+      ]
+    }
+  }
+}

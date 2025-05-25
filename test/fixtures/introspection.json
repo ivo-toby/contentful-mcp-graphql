@@ -1,0 +1,20 @@
+{
+  "data": {
+    "__schema": {
+      "queryType": {
+        "fields": [
+          {
+            "name": "pageArticleCollection",
+            "description": "Page Article Collection",
+            "type": { "kind": "OBJECT", "ofType": { "name": "PageArticleCollection", "kind": "OBJECT" } }
+          },
+          {
+            "name": "topicCategoryCollection",
+            "description": "Topic Category Collection",
+            "type": { "kind": "OBJECT", "ofType": { "name": "TopicCategoryCollection", "kind": "OBJECT" } }
+          }
+        ]
+      }
+    }
+  }
+}

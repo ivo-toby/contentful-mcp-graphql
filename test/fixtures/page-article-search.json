@@ -1,0 +1,14 @@
+{
+  "data": {
+    "pageArticleCollection": {
+      "items": [
+        {
+          "sys": { "id": "article-1" },
+          "title": "How do I update my address?",
+          "internalName": "Address Update Guide",
+          "slug": "update-address"
+        }
+      ]
+    }
+  }
+}

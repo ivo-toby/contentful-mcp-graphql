@@ -1,0 +1,13 @@
+{
+  "data": {
+    "topicCategoryCollection": {
+      "items": [
+        {
+          "sys": { "id": "category-1" },
+          "name": "Account Management",
+          "description": "Topics about managing your account and personal information"
+        }
+      ]
+    }
+  }
+}

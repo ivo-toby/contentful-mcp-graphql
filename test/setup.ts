@@ -1,5 +1,7 @@
-import { beforeAll, expect } from "vitest"
+import { beforeAll, afterAll, afterEach, expect } from "vitest"
 import dotenv from "dotenv"
+import { setupServer } from "msw/node"
+import { handlers } from "./msw-handlers"
 
 // Load environment variables from .env file
 dotenv.config()
@@ -18,5 +20,12 @@ beforeAll(() => {
     process.env.ENVIRONMENT_ID = "master"
   }
 })
+
+const server = setupServer(...handlers)
+
+// Start MSW server before tests
+beforeAll(() => server.listen())
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
 
 export { expect }
