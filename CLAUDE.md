@@ -25,12 +25,12 @@
 
 ## Testing
 
-Tests use Vitest with MSW for API mocking. Organize tests in:
+Tests use Vitest with a lightweight unit testing approach. Current test structure:
 
-- `test/unit/` - Unit tests for utility functions
-- `test/integration/` - Tests that verify handler behavior
+- `test/unit/` - Lightweight unit tests for public API functions
+
+Focus on testing behavior, not implementation details. See `test/README.md` for detailed testing guidelines.
 
 ## Context
 
 This is a MCP Server that enables LLM's to connect to Contentful GraphQL Endpoint.
-

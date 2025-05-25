@@ -15,6 +15,7 @@ import {
   graphqlHandlers,
   fetchGraphQLSchema,
   setGraphQLSchema,
+  loadContentfulMetadata,
 } from "./handlers/graphql-handlers.js"
 import { getTools } from "./types/tools.js"
 import { validateEnvironment } from "./utils/validation.js"
@@ -39,6 +40,10 @@ export function getAllTools() {
     staticTools.GRAPHQL_GET_CONTENT_TYPE_SCHEMA = allStaticTools.GRAPHQL_GET_CONTENT_TYPE_SCHEMA
   if (allStaticTools.GRAPHQL_GET_EXAMPLE)
     staticTools.GRAPHQL_GET_EXAMPLE = allStaticTools.GRAPHQL_GET_EXAMPLE
+  if (allStaticTools.SMART_SEARCH)
+    staticTools.SMART_SEARCH = allStaticTools.SMART_SEARCH
+  if (allStaticTools.BUILD_SEARCH_QUERY)
+    staticTools.BUILD_SEARCH_QUERY = allStaticTools.BUILD_SEARCH_QUERY
 
   return staticTools
 }
@@ -118,6 +123,8 @@ function getHandler(name: string): ((args: any) => Promise<any>) | undefined {
     graphql_list_content_types: graphqlHandlers.listContentTypes,
     graphql_get_content_type_schema: graphqlHandlers.getContentTypeSchema,
     graphql_get_example: graphqlHandlers.getExample,
+    smart_search: graphqlHandlers.smartSearch,
+    build_search_query: graphqlHandlers.buildSearchQuery,
   }
 
   return cdaOnlyHandlers[name as keyof typeof cdaOnlyHandlers]
@@ -154,6 +161,24 @@ async function loadGraphQLSchema() {
   }
 }
 
+// Function to load Contentful metadata into cache
+async function loadContentfulCache() {
+  try {
+    const spaceId = process.env.SPACE_ID
+    const environmentId = process.env.ENVIRONMENT_ID || "master"
+    const cdaToken = process.env.CONTENTFUL_DELIVERY_ACCESS_TOKEN
+
+    if (!spaceId || !cdaToken) {
+      console.error("Unable to load Contentful metadata: Space ID or CDA access token not provided")
+      return
+    }
+
+    await loadContentfulMetadata(spaceId, environmentId, cdaToken)
+  } catch (error) {
+    console.error("Error loading Contentful metadata:", error)
+  }
+}
+
 // Start the server
 async function runServer() {
   // Determine if HTTP server mode is enabled
@@ -163,6 +188,7 @@ async function runServer() {
   // Load GraphQL schema
   const loadPromises = []
   loadPromises.push(loadGraphQLSchema())
+  loadPromises.push(loadContentfulCache())
 
   // Wait for all resources to load
   await Promise.all(loadPromises)
@@ -200,7 +226,11 @@ async function runServer() {
   // Set up periodic refresh of GraphQL schema (every 5 minutes)
   setInterval(
     () => {
-      loadGraphQLSchema().catch((error) => console.error("Error refreshing GraphQL schema:", error))
+      const promises = [
+        loadGraphQLSchema().catch((error) => console.error("Error refreshing GraphQL schema:", error)),
+        loadContentfulCache().catch((error) => console.error("Error refreshing Contentful cache:", error))
+      ]
+      Promise.all(promises)
     },
     5 * 60 * 1000,
   )
