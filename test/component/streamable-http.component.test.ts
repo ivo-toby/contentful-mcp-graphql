@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { StreamableHttpServer } from "../../src/transports/streamable-http.js"
+import { StreamableHttpServer } from "../../src/transports/streamable-http"
 import express from "express"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
 
@@ -267,4 +267,3 @@ describe("StreamableHTTP Server", () => {
     expect(unknownHandler).toBeUndefined()
   })
 })
-

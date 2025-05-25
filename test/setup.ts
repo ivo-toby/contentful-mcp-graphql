@@ -1,7 +1,10 @@
-import { beforeAll, afterAll, afterEach, expect } from "vitest"
+import { beforeAll, afterAll, afterEach, beforeEach, expect } from "vitest"
 import dotenv from "dotenv"
 import { setupServer } from "msw/node"
 import { handlers } from "./msw-handlers"
+import { initializeTestCache, cleanupTestCache } from "./unit/mocks/cache-init"
+import { setupFetchSpy, resetFetchSpy } from "./unit/mocks/fetch-spy"
+import { clearCache } from "../src/handlers/graphql-handlers"
 
 // Load environment variables from .env file
 dotenv.config()
@@ -24,8 +27,57 @@ beforeAll(() => {
 const server = setupServer(...handlers)
 
 // Start MSW server before tests
-beforeAll(() => server.listen())
-afterEach(() => server.resetHandlers())
-afterAll(() => server.close())
+beforeAll(() => {
+  // Initialize MSW
+  server.listen({ onUnhandledRequest: "warn" })
+})
+
+beforeEach(() => {
+  // Clear cache and re-initialize
+  clearCache()
+  initializeTestCache()
+
+  // Set up fetch spy
+  setupFetchSpy()
+})
+
+afterEach(() => {
+  // Reset handlers
+  server.resetHandlers()
+
+  // Reset fetch spy
+  resetFetchSpy()
+
+  // Clear cache
+  clearCache()
+})
+
+afterAll(() => {
+  server.close()
+  cleanupTestCache()
+})
+
+// Add custom matcher for error responses
+expect.extend({
+  toBeErrorResponse(received, message) {
+    const pass =
+      received.isError === true &&
+      received.content &&
+      received.content[0] &&
+      received.content[0].text.includes(message)
+
+    if (pass) {
+      return {
+        message: () => `expected ${received} not to be an error response containing "${message}"`,
+        pass: true,
+      }
+    } else {
+      return {
+        message: () => `expected ${received} to be an error response containing "${message}"`,
+        pass: false,
+      }
+    }
+  },
+})
 
 export { expect }

@@ -8,7 +8,7 @@
  * but we'll skip the actual API request tests.
  */
 import { expect, vi, describe, it, beforeAll, afterAll, afterEach } from "vitest"
-import { graphqlHandlers, setGraphQLSchema } from "../../src/handlers/graphql-handlers.js"
+import { graphqlHandlers, setGraphQLSchema } from "../../src/handlers/graphql-handlers"
 import { setupServer } from "msw/node"
 import { http, HttpResponse } from "msw"
 import { buildSchema } from "graphql"

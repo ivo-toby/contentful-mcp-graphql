@@ -1,46 +1,95 @@
-// @ts-ignore: Allow import from msw for testing
-import { rest } from "msw"
+// @ts-nocheck
+/* eslint-disable */
+
+// @ts-ignore: msw provides rest at runtime
+import { graphql } from "msw"
 import introspection from "./fixtures/introspection.json"
 import pageArticleSchema from "./fixtures/page-article-schema.json"
 import topicCategorySchema from "./fixtures/topic-category-schema.json"
 import pageArticleSearch from "./fixtures/page-article-search.json"
 import topicCategorySearch from "./fixtures/topic-category-search.json"
 
-// Base Contentful GraphQL endpoint (using default test-space-id and master environment)
-const GRAPHQL_URL =
-  "https://graphql.contentful.com/content/v1/spaces/test-space-id/environments/master"
-
+// Handlers for GraphQL operations
 export const handlers = [
-  rest.post(GRAPHQL_URL, async (req: any, res: any, ctx: any) => {
-    const body = (await req.json()) as { query: string }
-    const query = body.query
+  // Introspection Query (used by loadContentfulMetadata)
+  graphql.query("IntrospectionQuery", (req, res, ctx) => {
+    console.log("MSW: IntrospectionQuery intercepted")
+    return res(ctx.data(introspection.data))
+  }),
 
-    // Introspection: list content types
-    if (query.includes("__schema")) {
-      return res(ctx.status(200), ctx.json(introspection))
+  // Specific type schema queries (used by loadContentfulMetadata)
+  graphql.query("GetContentTypeDefinition", (req, res, ctx) => {
+    console.log("MSW: GetContentTypeDefinition for", req.variables.contentType)
+    if (req.variables.contentType === "PageArticle") {
+      return res(ctx.data(pageArticleSchema.data))
+    }
+    if (req.variables.contentType === "TopicCategory") {
+      return res(ctx.data(topicCategorySchema.data))
+    }
+    return res(
+      ctx.status(404),
+      ctx.errors([
+        {
+          message: `Mock for GetContentTypeDefinition not found for ${req.variables.contentType}`,
+        },
+      ]),
+    )
+  }),
+
+  // Search queries (used by smartSearch)
+  graphql.query("SearchPageArticle", (req, res, ctx) => {
+    console.log("MSW: SearchPageArticle intercepted")
+    return res(ctx.data(pageArticleSearch.data))
+  }),
+  graphql.query("SearchTopicCategory", (req, res, ctx) => {
+    console.log("MSW: SearchTopicCategory intercepted")
+    return res(ctx.data(topicCategorySearch.data))
+  }),
+
+  // Fallback for any other GraphQL operations
+  graphql.operation((req, res, ctx) => {
+    console.warn(`MSW: Unhandled GraphQL operation: ${req.operationName}`, req.variables)
+    const query = req.query || ""
+
+    // Attempt to match based on query content for common anonymous operations
+    if (req.operationName === "IntrospectionQuery" || query.includes("__schema {")) {
+      console.log("MSW Fallback: IntrospectionQuery")
+      return res(ctx.data(introspection.data))
     }
 
-    // Schema for PageArticle
-    if (query.includes("__type") && query.includes("PageArticle")) {
-      return res(ctx.status(200), ctx.json(pageArticleSchema))
+    if (query.includes('__type(name: "PageArticle")')) {
+      console.log("MSW Fallback: GetContentTypeDefinition PageArticle")
+      return res(ctx.data(pageArticleSchema.data))
     }
 
-    // Schema for TopicCategory
-    if (query.includes("__type") && query.includes("TopicCategory")) {
-      return res(ctx.status(200), ctx.json(topicCategorySchema))
+    if (query.includes('__type(name: "TopicCategory")')) {
+      console.log("MSW Fallback: GetContentTypeDefinition TopicCategory")
+      return res(ctx.data(topicCategorySchema.data))
     }
 
-    // Search for PageArticle
-    if (query.includes("pageArticleCollection") && query.includes("_contains")) {
-      return res(ctx.status(200), ctx.json(pageArticleSearch))
+    if (query.includes("pageArticleCollection")) {
+      console.log("MSW Fallback: SearchPageArticle")
+      return res(ctx.data(pageArticleSearch.data))
     }
 
-    // Search for TopicCategory
-    if (query.includes("topicCategoryCollection") && query.includes("_contains")) {
-      return res(ctx.status(200), ctx.json(topicCategorySearch))
+    if (query.includes("topicCategoryCollection")) {
+      console.log("MSW Fallback: SearchTopicCategory")
+      return res(ctx.data(topicCategorySearch.data))
     }
 
-    // Default empty response
-    return res(ctx.status(200), ctx.json({ data: {} }))
+    console.error(
+      `MSW: No matching handler for GraphQL query: ${req.operationName || "anonymous"}`,
+      query.substring(0, 200),
+    )
+    return res(
+      ctx.status(500),
+      ctx.json({
+        errors: [
+          {
+            message: `MSW: No mock handler for GraphQL query: ${req.operationName || "anonymous"}`,
+          },
+        ],
+      }),
+    )
   }),
 ]

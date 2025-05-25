@@ -1175,3 +1175,6 @@ function isReferenceType(typeString: string): boolean {
     !typeString.includes("Connection")
   )
 }
+
+// Export helper functions for unit testing
+export { formatGraphQLType, isScalarType, isSearchableTextField, isReferenceType }
