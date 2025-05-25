@@ -7,24 +7,21 @@ let graphqlSchema: GraphQLSchema | null = null
 
 // Interfaces for GraphQL schema exploration tools
 export interface ListContentTypesArgs {
-  spaceId: string
-  environmentId?: string
-  cdaToken: string
+  spaceId?: string // Optional override for environment variable
+  environmentId?: string // Optional override for environment variable
 }
 
 export interface GetContentTypeSchemaArgs {
   contentType: string
-  spaceId: string
-  environmentId?: string
-  cdaToken: string
+  spaceId?: string // Optional override for environment variable
+  environmentId?: string // Optional override for environment variable
 }
 
 export interface GetGraphQLExampleArgs {
   contentType: string
   includeRelations?: boolean
-  spaceId: string
-  environmentId?: string
-  cdaToken: string
+  spaceId?: string // Optional override for environment variable
+  environmentId?: string // Optional override for environment variable
 }
 
 // Types for GraphQL API responses
@@ -154,11 +151,10 @@ export function setGraphQLSchema(schema: GraphQLSchema): void {
 
 // Interface for GraphQL query arguments
 export interface GraphQLQueryArgs {
-  spaceId: string
-  environmentId?: string
+  spaceId?: string // Optional override for environment variable
+  environmentId?: string // Optional override for environment variable
   query: string
   variables?: Record<string, any>
-  cdaToken: string // Content Delivery API token (required for GraphQL queries)
 }
 
 // Execute a GraphQL query against the Contentful GraphQL API
@@ -166,13 +162,14 @@ export const graphqlHandlers = {
   // List all content types available in the GraphQL schema
   listContentTypes: async (args: ListContentTypesArgs): Promise<ToolResponse> => {
     try {
-      const spaceId = args.spaceId
-      const environmentId = args.environmentId || "master"
-      const accessToken = args.cdaToken
+      // Get values from environment variables with optional overrides
+      const spaceId = args.spaceId || process.env.SPACE_ID
+      const environmentId = args.environmentId || process.env.ENVIRONMENT_ID || "master"
+      const accessToken = process.env.CONTENTFUL_DELIVERY_ACCESS_TOKEN
 
       if (!spaceId) {
         return {
-          content: [{ type: "text", text: "Space ID is required" }],
+          content: [{ type: "text", text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)" }],
           isError: true,
         }
       }
@@ -182,7 +179,7 @@ export const graphqlHandlers = {
           content: [
             {
               type: "text",
-              text: "Content Delivery API (CDA) token is required for GraphQL queries",
+              text: "Content Delivery API (CDA) token is required for GraphQL queries (set CONTENTFUL_DELIVERY_ACCESS_TOKEN environment variable)",
             },
           ],
           isError: true,
@@ -283,13 +280,14 @@ export const graphqlHandlers = {
   // Get schema details for a specific content type
   getContentTypeSchema: async (args: GetContentTypeSchemaArgs): Promise<ToolResponse> => {
     try {
-      const spaceId = args.spaceId
-      const environmentId = args.environmentId || "master"
-      const accessToken = args.cdaToken
+      // Get values from environment variables with optional overrides
+      const spaceId = args.spaceId || process.env.SPACE_ID
+      const environmentId = args.environmentId || process.env.ENVIRONMENT_ID || "master"
+      const accessToken = process.env.CONTENTFUL_DELIVERY_ACCESS_TOKEN
 
       if (!spaceId) {
         return {
-          content: [{ type: "text", text: "Space ID is required" }],
+          content: [{ type: "text", text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)" }],
           isError: true,
         }
       }
@@ -299,7 +297,7 @@ export const graphqlHandlers = {
           content: [
             {
               type: "text",
-              text: "Content Delivery API (CDA) token is required for GraphQL queries",
+              text: "Content Delivery API (CDA) token is required for GraphQL queries (set CONTENTFUL_DELIVERY_ACCESS_TOKEN environment variable)",
             },
           ],
           isError: true,
@@ -423,15 +421,15 @@ export const graphqlHandlers = {
   // Get example GraphQL queries for a content type
   getExample: async (args: GetGraphQLExampleArgs): Promise<ToolResponse> => {
     try {
-      const spaceId = args.spaceId
-      const environmentId = args.environmentId || "master"
+      // Get values from environment variables with optional overrides
+      const spaceId = args.spaceId || process.env.SPACE_ID
+      const environmentId = args.environmentId || process.env.ENVIRONMENT_ID || "master"
 
       // First get the schema
       const schemaResult = await graphqlHandlers.getContentTypeSchema({
         contentType: args.contentType,
         spaceId,
         environmentId,
-        cdaToken: args.cdaToken,
       })
 
       if (schemaResult.isError) {
@@ -527,13 +525,14 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
   // Execute a GraphQL query
   executeQuery: async (args: GraphQLQueryArgs): Promise<ToolResponse> => {
     try {
-      const spaceId = args.spaceId
-      const environmentId = args.environmentId || "master"
-      const accessToken = args.cdaToken
+      // Get values from environment variables with optional overrides
+      const spaceId = args.spaceId || process.env.SPACE_ID
+      const environmentId = args.environmentId || process.env.ENVIRONMENT_ID || "master"
+      const accessToken = process.env.CONTENTFUL_DELIVERY_ACCESS_TOKEN
 
       if (!spaceId) {
         return {
-          content: [{ type: "text", text: "Space ID is required" }],
+          content: [{ type: "text", text: "Space ID is required (set SPACE_ID environment variable or provide spaceId parameter)" }],
           isError: true,
         }
       }
@@ -543,7 +542,7 @@ ${scalarFields.map((field: string) => `    ${field}`).join("\n")}
           content: [
             {
               type: "text",
-              text: "Content Delivery API (CDA) token is required for GraphQL queries",
+              text: "Content Delivery API (CDA) token is required for GraphQL queries (set CONTENTFUL_DELIVERY_ACCESS_TOKEN environment variable)",
             },
           ],
           isError: true,

@@ -72,9 +72,6 @@ describe("GraphQL Handler Variables Test", () => {
     } as any)
 
     const result = await graphqlHandlers.executeQuery({
-      spaceId: "test-space-id",
-      environmentId: "master",
-      cdaToken: "test-token",
       query: `
         query GetAssets($limit: Int) {
           assets(limit: $limit) {
