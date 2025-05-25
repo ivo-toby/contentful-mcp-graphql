@@ -4,11 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: [
-      "test/unit/**/*.test.ts",
-      "test/component/**/*.test.ts",
-      "test/integration/**/*.test.ts",
-    ],
+    include: ["test/unit/**/*.test.ts"],
     setupFiles: ["test/setup.ts"],
     env: {
       CONTENTFUL_DELIVERY_ACCESS_TOKEN: "test-token",

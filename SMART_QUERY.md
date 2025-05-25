@@ -9,8 +9,9 @@ This document details the implementation of caching and smart search functionali
 ### Original Pain Points
 
 1. **Manual Tool Chaining Required**: Users had to manually execute 3+ tool calls to perform a simple search:
+
    - `graphql_list_content_types` → discover available content types
-   - `graphql_get_content_type_schema` → understand field structure  
+   - `graphql_get_content_type_schema` → understand field structure
    - `graphql_query` → actually search for content
 
 2. **High Latency**: Each tool call required API requests to Contentful, resulting in 3-5 second delays for basic operations
@@ -22,8 +23,9 @@ This document details the implementation of caching and smart search functionali
 ### Specific Use Case
 
 The triggering scenario was a user trying to find content about "updating address":
+
 1. Called `graphql_list_content_types` → got 29 content types
-2. Had to manually examine `pageArticleCollection` 
+2. Had to manually examine `pageArticleCollection`
 3. Called `graphql_get_content_type_schema` → got field structure
 4. Manually constructed GraphQL query to search across title/slug fields
 5. Finally found the entry: "How do I update my address?" with ID `5PmzE2MC9Xx1M3qsuQE2C7`
@@ -46,13 +48,16 @@ This workflow was identified as fundamentally broken for practical use.
 **Location**: `src/handlers/graphql-handlers.ts`
 
 **Global State Variables**:
+
 ```typescript
-let contentTypesCache: Array<{name: string, queryName: string, description?: string}> | null = null
+let contentTypesCache: Array<{ name: string; queryName: string; description?: string }> | null =
+  null
 let contentTypeSchemasCache: Map<string, any> = new Map()
 let lastCacheUpdate: Date | null = null
 ```
 
 **Key Functions**:
+
 - `loadContentfulMetadata()`: Preloads all content types and their schemas
 - `getCachedContentTypes()`: Returns cached content type list
 - `getCachedContentTypeSchema()`: Returns cached schema for specific content type
@@ -60,6 +65,7 @@ let lastCacheUpdate: Date | null = null
 - `getCacheStatus()`: Provides cache statistics and health
 
 **Loading Strategy**:
+
 1. Fetch content types using GraphQL introspection
 2. Parallel load of all content type schemas
 3. Store in memory for instant access
@@ -72,6 +78,7 @@ let lastCacheUpdate: Date | null = null
 **Handler**: `graphqlHandlers.smartSearch()`
 
 **Algorithm**:
+
 1. Check cache availability (fail fast if not ready)
 2. Filter target content types (if specified by user)
 3. For each content type:
@@ -82,6 +89,7 @@ let lastCacheUpdate: Date | null = null
 4. Aggregate results and return unified response
 
 **Input Parameters**:
+
 ```typescript
 {
   query: string,              // Search term
@@ -93,6 +101,7 @@ let lastCacheUpdate: Date | null = null
 ```
 
 **Output Format**:
+
 ```typescript
 {
   query: string,
@@ -112,6 +121,7 @@ let lastCacheUpdate: Date | null = null
 **Handler**: `graphqlHandlers.buildSearchQuery()`
 
 **Functionality**:
+
 1. Validate content type exists in cache
 2. Identify searchable text fields
 3. Allow filtering to specific fields if requested
@@ -119,6 +129,7 @@ let lastCacheUpdate: Date | null = null
 5. Return query string, variables, and field information
 
 **Use Cases**:
+
 - Learning tool for users to understand GraphQL syntax
 - Template generation for custom queries
 - Debugging search logic
@@ -126,10 +137,12 @@ let lastCacheUpdate: Date | null = null
 #### 4. Enhanced Existing Handlers
 
 **Modified Handlers**:
+
 - `listContentTypes()`: Now checks cache first, falls back to API
 - `getContentTypeSchema()`: Uses cached schema when available
 
 **Cache Integration Pattern**:
+
 ```typescript
 // Check cache first
 if (isCacheAvailable()) {
@@ -150,19 +163,21 @@ return await callAPI()
 **Location**: `src/index.ts`
 
 **Changes**:
+
 1. Added `loadContentfulCache()` function alongside existing `loadGraphQLSchema()`
 2. Parallel loading of both schema and metadata cache at startup
 3. Periodic refresh of both caches every 5 minutes
 4. Added new tool registrations and handler mappings
 
 **Tool Registration**:
+
 ```typescript
 SMART_SEARCH: {
   name: "smart_search",
   description: "Perform intelligent search across multiple content types using cached metadata..."
 },
 BUILD_SEARCH_QUERY: {
-  name: "build_search_query", 
+  name: "build_search_query",
   description: "Generate a GraphQL search query for a specific content type..."
 }
 ```
@@ -172,6 +187,7 @@ BUILD_SEARCH_QUERY: {
 ### Helper Functions
 
 **Type Detection**:
+
 ```typescript
 function isScalarType(typeString: string): boolean {
   const scalarTypes = ["String", "Int", "Float", "Boolean", "ID", "DateTime", "JSON"]
@@ -202,16 +218,14 @@ function isSearchableTextField(typeString: string): boolean {
 
 ## Test Coverage
 
-### Unit Tests (`test/unit/`)
+### Current Test Coverage (`test/unit/`)
 
-1. **`cache.test.ts`**: Cache loading, error handling, status reporting
-2. **`smart-search.test.ts`**: Smart search functionality, filtering, error cases
-3. **`build-search-query.test.ts`**: Query generation, field filtering, validation
-4. **`cached-handlers.test.ts`**: Enhanced handlers using cache vs API fallback
+Lightweight unit tests covering:
 
-### Integration Tests (`test/integration/`)
-
-1. **`cache-integration.test.ts`**: End-to-end workflow testing cache loading → smart search → query building
+1. **Cache management functions**: Status, loading, clearing
+2. **Utility functions**: Type detection, field identification
+3. **Tool configuration**: Schema generation, validation
+4. **Environment validation**: Required variables, port validation
 
 ### Test Scenarios Covered
 
@@ -230,13 +244,15 @@ function isSearchableTextField(typeString: string): boolean {
 ## Performance Impact
 
 ### Before Implementation
-- **Search for "address" content**: 
+
+- **Search for "address" content**:
   - 3+ manual tool calls
   - ~3-5 seconds total latency
   - Required technical GraphQL knowledge
   - 3+ API requests to Contentful
 
 ### After Implementation
+
 - **Search for "address" content**:
   - 1 smart search call: `smart_search: { query: "address" }`
   - ~500ms total latency (after cache loaded)
@@ -244,11 +260,13 @@ function isSearchableTextField(typeString: string): boolean {
   - 0 metadata API requests (served from cache)
 
 ### Memory Usage
+
 - **Content Types Cache**: ~1-5KB per space (typically 10-50 content types)
 - **Schema Cache**: ~5-20KB per content type
 - **Total**: Typically <1MB for most Contentful spaces
 
 ### Startup Time
+
 - **Additional Load Time**: ~2-5 seconds during initial cache load
 - **Refresh Overhead**: ~1-2 seconds every 5 minutes
 - **Trade-off**: Acceptable startup cost for dramatic runtime improvement
@@ -258,6 +276,7 @@ function isSearchableTextField(typeString: string): boolean {
 ### Smart Search (Replaces 3+ Tool Calls)
 
 **Before**:
+
 ```
 1. graphql_list_content_types → 29 content types
 2. graphql_get_content_type_schema: pageArticle → fields structure
@@ -265,6 +284,7 @@ function isSearchableTextField(typeString: string): boolean {
 ```
 
 **After**:
+
 ```
 smart_search: { query: "address" }
 → Returns all matching content across all content types
@@ -273,8 +293,8 @@ smart_search: { query: "address" }
 ### Query Building for Learning
 
 ```
-build_search_query: { 
-  contentType: "pageArticle", 
+build_search_query: {
+  contentType: "pageArticle",
   searchTerm: "address",
   fields: ["title", "slug"]
 }
@@ -284,10 +304,10 @@ build_search_query: {
 ### Targeted Search
 
 ```
-smart_search: { 
-  query: "payment", 
+smart_search: {
+  query: "payment",
   contentTypes: ["pageArticle", "topicCategory"],
-  limit: 3 
+  limit: 3
 }
 → Search only specific content types
 ```
@@ -295,11 +315,13 @@ smart_search: {
 ## Backward Compatibility
 
 ### Existing Functionality Preserved
+
 - All original tools (`graphql_query`, `graphql_list_content_types`, etc.) work unchanged
 - API fallback ensures functionality when cache unavailable
 - No breaking changes to existing tool interfaces
 
 ### Enhanced Existing Tools
+
 - Existing tools now faster when cache available
 - Added `cached: true` indicator in responses when served from cache
 - Graceful degradation maintains original behavior
@@ -331,17 +353,21 @@ smart_search: {
 ## Deployment Notes
 
 ### Environment Variables
+
 No new environment variables required. Uses existing:
+
 - `SPACE_ID`
-- `ENVIRONMENT_ID` 
+- `ENVIRONMENT_ID`
 - `CONTENTFUL_DELIVERY_ACCESS_TOKEN`
 
 ### Startup Behavior
+
 - Cache loading happens in parallel with GraphQL schema loading
 - Server starts successfully even if cache loading fails
 - Periodic refresh ensures cache stays current
 
 ### Error Recovery
+
 - Cache automatically rebuilds on next refresh cycle if corrupted
 - API fallback ensures service availability during cache issues
 - Clear error messages guide users when tools unavailable
@@ -353,6 +379,7 @@ The smart query implementation successfully addresses the core usability issues 
 The solution maintains full backward compatibility while providing a significantly improved user experience, particularly for the common use case of searching for content by text across multiple content types.
 
 **Key Success Metrics**:
+
 - ✅ Reduced tool calls: 3+ → 1 for common searches
 - ✅ Improved latency: 3-5s → 0.5s after cache load
 - ✅ Zero breaking changes to existing functionality

@@ -8,7 +8,7 @@ let graphqlSchema: GraphQLSchema | null = null
 // Store content types and schemas in memory for fast access
 let contentTypesCache: Array<{ name: string; queryName: string; description?: string }> | null =
   null
-let contentTypeSchemasCache: Map<string, any> = new Map()
+const contentTypeSchemasCache: Map<string, any> = new Map()
 let lastCacheUpdate: Date | null = null
 
 // Interfaces for GraphQL schema exploration tools

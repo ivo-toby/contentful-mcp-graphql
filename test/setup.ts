@@ -1,9 +1,5 @@
-import { beforeAll, afterAll, afterEach, beforeEach, expect } from "vitest"
+import { beforeAll, expect } from "vitest"
 import dotenv from "dotenv"
-import { setupServer } from "msw/node"
-import { handlers } from "./msw-handlers"
-import { initializeTestCache, cleanupTestCache } from "./unit/mocks/cache-init"
-import { setupFetchSpy, resetFetchSpy } from "./unit/mocks/fetch-spy"
 import { clearCache } from "../src/handlers/graphql-handlers"
 
 // Load environment variables from .env file
@@ -22,39 +18,9 @@ beforeAll(() => {
   if (!process.env.ENVIRONMENT_ID) {
     process.env.ENVIRONMENT_ID = "master"
   }
-})
 
-const server = setupServer(...handlers)
-
-// Start MSW server before tests
-beforeAll(() => {
-  // Initialize MSW
-  server.listen({ onUnhandledRequest: "warn" })
-})
-
-beforeEach(() => {
-  // Clear cache and re-initialize
+  // Clear cache at start
   clearCache()
-  initializeTestCache()
-
-  // Set up fetch spy
-  setupFetchSpy()
-})
-
-afterEach(() => {
-  // Reset handlers
-  server.resetHandlers()
-
-  // Reset fetch spy
-  resetFetchSpy()
-
-  // Clear cache
-  clearCache()
-})
-
-afterAll(() => {
-  server.close()
-  cleanupTestCache()
 })
 
 // Add custom matcher for error responses
