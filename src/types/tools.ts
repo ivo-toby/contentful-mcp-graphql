@@ -105,6 +105,57 @@ export const getGraphQLTools = () => {
         required: ["query"],
       }),
     },
+
+    SMART_SEARCH: {
+      name: "smart_search",
+      description:
+        "Perform intelligent search across multiple content types using cached metadata. This tool automatically searches all text fields in your content types for the given query term. Much faster and easier than manually chaining multiple GraphQL calls.",
+      inputSchema: getOptionalEnvProperties({
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "The search term to look for across content types",
+          },
+          contentTypes: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional: Limit search to specific content types (default: search all)",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of results per content type (default: 5)",
+            default: 5,
+          },
+        },
+        required: ["query"],
+      }),
+    },
+
+    BUILD_SEARCH_QUERY: {
+      name: "build_search_query",
+      description:
+        "Generate a GraphQL search query for a specific content type based on cached schema information. Returns the query string and variables needed to search text fields in the content type.",
+      inputSchema: getOptionalEnvProperties({
+        type: "object",
+        properties: {
+          contentType: {
+            type: "string",
+            description: "The content type to build a search query for",
+          },
+          searchTerm: {
+            type: "string",
+            description: "The term to search for",
+          },
+          fields: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional: Specific fields to search (default: all searchable text fields)",
+          },
+        },
+        required: ["contentType", "searchTerm"],
+      }),
+    },
   }
 }
 
